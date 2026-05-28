@@ -114,6 +114,46 @@ carribu_driver_app/
 | `driver-location` | Emit      | Send driver GPS coordinates         |
 | `chat-message`    | Emit      | Send a chat message                 |
 
+## Building the APK
+
+This project uses [EAS Build](https://docs.expo.dev/build/introduction/) (Expo Application Services) to produce Android APKs and app bundles.
+
+### First-time setup
+
+```bash
+# Log in to your Expo account
+npx eas-cli login
+
+# (Optional) Reconfigure build settings
+npx eas-cli build:configure
+```
+
+### Build commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run build:apk` | Build a distributable APK (preview profile) |
+| `npm run build:apk:dev` | Build a dev client APK with debugging |
+| `npm run build:aab` | Build a production AAB for Google Play |
+| `npm run build:ios` | Build for iOS (production) |
+| `npm run build:all` | Build for all platforms |
+
+### Example: Build an APK
+
+```bash
+npm run build:apk
+```
+
+EAS Build runs in the cloud. Once the build completes, you'll receive a download link for the `.apk` file. You can also check build status at [expo.dev](https://expo.dev).
+
+### Build profiles (eas.json)
+
+| Profile | Output | Use case |
+|---------|--------|----------|
+| `development` | APK | Dev client with debugging tools |
+| `preview` | APK | Internal testing / QA distribution |
+| `production` | AAB | Google Play Store submission |
+
 ## Environment Notes
 
 - The app requires `ACCESS_FINE_LOCATION` permission on Android for GPS tracking
