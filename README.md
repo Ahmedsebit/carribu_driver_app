@@ -166,6 +166,29 @@ EAS Build runs in the cloud. Once the build completes, you'll receive a download
 - **Location not updating:** Ensure location permissions are granted in device settings
 - **Socket not connecting:** Check that the socket URL in `src/services/socket.js` matches your backend address
 
+## Versioning
+
+This project follows [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH). Version bumps automatically sync `package.json` and `app.json`, then create a git tag.
+
+### Commands
+
+```bash
+# Patch release (bug fixes): 2.0.0 → 2.0.1
+npm run version:patch
+
+# Minor release (new features): 2.0.0 → 2.1.0
+npm run version:minor
+
+# Major release (breaking changes): 2.0.0 → 3.0.0
+npm run version:major
+```
+
+After bumping, push the commit and tag:
+
+```bash
+git push && git push --tags
+```
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

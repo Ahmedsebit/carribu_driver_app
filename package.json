@@ -10,7 +10,10 @@
     "build:apk:dev": "eas build --platform android --profile development",
     "build:aab": "eas build --platform android --profile production",
     "build:ios": "eas build --platform ios --profile production",
-    "build:all": "eas build --platform all --profile production"
+    "build:all": "eas build --platform all --profile production",
+    "version:patch": "node scripts/version-bump.js patch",
+    "version:minor": "node scripts/version-bump.js minor",
+    "version:major": "node scripts/version-bump.js major"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
