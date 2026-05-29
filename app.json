@@ -1,13 +1,34 @@
 {
   "expo": {
     "name": "SchoolTransport Driver",
-    "slug": "school-transport-driver",
+    "slug": "carribudriver",
     "version": "2.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "sdkVersion": "55.0.0",
-    "platforms": ["ios","android","web"],
-    "ios": {"supportsTablet": true},
-    "android": {"permissions":["ACCESS_FINE_LOCATION"]}
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.carribu.driver",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.carribu.driver",
+      "permissions": [
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "deedde0b-7d63-4f67-a26f-be7d15a5c7b6"
+      }
+    },
+    "owner": "firstbodis-organization"
   }
 }
