@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "SchoolTransport Driver",
+    "slug": "school-transport-driver",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "sdkVersion": "55.0.0",
+    "platforms": ["ios","android","web"],
+    "ios": {"supportsTablet": true},
+    "android": {"permissions":["ACCESS_FINE_LOCATION"]}
+  }
+}
