@@ -19,12 +19,15 @@ A React Native (Expo) mobile application for school transport drivers. Part of t
 - **Real-time:** Socket.IO client
 - **Maps:** react-native-maps + Directions
 - **Storage:** AsyncStorage for token/session persistence
+- **Build Service:** EAS Build (Expo Application Services)
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18 or later recommended)
 - [Expo CLI](https://docs.expo.dev/get-started/installation/) (`npm install -g expo-cli`)
+- [EAS CLI](https://docs.expo.dev/build/setup/) (included as dev dependency, or install globally with `npm install -g eas-cli`)
 - [Expo Go](https://expo.dev/client) app on your physical device (iOS/Android), **or** an Android emulator / iOS simulator
+- An [Expo account](https://expo.dev/signup) (required for EAS builds)
 - The Carribu backend API server running locally or accessible via network
 
 ## Setup
@@ -49,6 +52,12 @@ A React Native (Expo) mobile application for school transport drivers. Part of t
    - **Android Emulator:** Use `http://10.0.2.2:5000` (maps to host machine's localhost)
    - **iOS Simulator:** Use `http://localhost:5000`
    - **Physical Device:** Use your machine's LAN IP (run `ipconfig` on Windows or `ifconfig` on Mac/Linux to find it), e.g. `http://192.168.1.100:5000`
+
+4. **Log in to Expo (for builds):**
+
+   ```bash
+   npx eas-cli login
+   ```
 
 ## Running Locally
 
@@ -91,10 +100,29 @@ carribu_driver_app/
 │   └── services/
 │       ├── api.js            # Axios HTTP client & API methods
 │       └── socket.js         # Socket.IO real-time connection
+├── scripts/
+│   └── version-bump.js       # Semantic version bump utility
 ├── app.json                  # Expo configuration
+├── eas.json                  # EAS Build profiles
 ├── babel.config.js           # Babel config for Expo
 └── package.json              # Dependencies & scripts
 ```
+
+## Available Scripts
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| `npm start` | `expo start` | Start Expo dev server |
+| `npm run android` | `expo start --android` | Launch on Android |
+| `npm run ios` | `expo start --ios` | Launch on iOS |
+| `npm run build:apk` | `eas build --platform android --profile preview` | Build distributable APK |
+| `npm run build:apk:dev` | `eas build --platform android --profile development` | Build dev client APK |
+| `npm run build:aab` | `eas build --platform android --profile production` | Build AAB for Google Play |
+| `npm run build:ios` | `eas build --platform ios --profile production` | Build for iOS |
+| `npm run build:all` | `eas build --platform all --profile production` | Build for all platforms |
+| `npm run version:patch` | `node scripts/version-bump.js patch` | Bump patch version |
+| `npm run version:minor` | `node scripts/version-bump.js minor` | Bump minor version |
+| `npm run version:major` | `node scripts/version-bump.js major` | Bump major version |
 
 ## API Endpoints Used
 
@@ -124,24 +152,21 @@ This project uses [EAS Build](https://docs.expo.dev/build/introduction/) (Expo A
 # Log in to your Expo account
 npx eas-cli login
 
-# (Optional) Reconfigure build settings
-npx eas-cli build:configure
+# Connect the project (already done — project ID: deedde0b-7d63-4f67-a26f-be7d15a5c7b6)
+npx eas-cli init --id deedde0b-7d63-4f67-a26f-be7d15a5c7b6
 ```
 
 ### Build commands
 
-| Command | Description |
-|---------|-------------|
-| `npm run build:apk` | Build a distributable APK (preview profile) |
-| `npm run build:apk:dev` | Build a dev client APK with debugging |
-| `npm run build:aab` | Build a production AAB for Google Play |
-| `npm run build:ios` | Build for iOS (production) |
-| `npm run build:all` | Build for all platforms |
-
-### Example: Build an APK
-
 ```bash
+# Build an APK for internal testing
 npm run build:apk
+
+# Build a production AAB for Google Play
+npm run build:aab
+
+# Build and auto-submit to stores
+npx eas-cli build --platform all --auto-submit
 ```
 
 EAS Build runs in the cloud. Once the build completes, you'll receive a download link for the `.apk` file. You can also check build status at [expo.dev](https://expo.dev).
@@ -154,17 +179,24 @@ EAS Build runs in the cloud. Once the build completes, you'll receive a download
 | `preview` | APK | Internal testing / QA distribution |
 | `production` | AAB | Google Play Store submission |
 
-## Environment Notes
+### iOS builds
 
-- The app requires `ACCESS_FINE_LOCATION` permission on Android for GPS tracking
-- Supported platforms: iOS, Android, and Web
-- The backend server must be running for login and all features to work
+iOS builds require Apple Developer credentials. Run the build command interactively (without `--non-interactive`) to set up:
 
-## Troubleshooting
+```bash
+npx eas-cli build --platform ios --profile production
+```
 
-- **Network errors on login:** Verify the API base URL matches your setup (emulator vs physical device) and that the backend server is running
-- **Location not updating:** Ensure location permissions are granted in device settings
-- **Socket not connecting:** Check that the socket URL in `src/services/socket.js` matches your backend address
+You'll be prompted to log in with your Apple ID and select your team/provisioning profile.
+
+## App Identifiers
+
+| Platform | Identifier |
+|----------|------------|
+| Android  | `com.carribu.driver` |
+| iOS      | `com.carribu.driver` |
+| Expo Owner | `firstbodis-organization` |
+| Expo Project ID | `deedde0b-7d63-4f67-a26f-be7d15a5c7b6` |
 
 ## Versioning
 
@@ -188,6 +220,24 @@ After bumping, push the commit and tag:
 ```bash
 git push && git push --tags
 ```
+
+## Environment Notes
+
+- The app requires `ACCESS_FINE_LOCATION` permission on Android for GPS tracking
+- Supported platforms: iOS, Android, and Web
+- The backend server must be running for login and all features to work
+- App versions are managed locally (`cli.appVersionSource: "local"` in eas.json)
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Network errors on login | Verify the API base URL matches your setup (emulator vs physical device) and that the backend is running |
+| Location not updating | Ensure location permissions are granted in device settings |
+| Socket not connecting | Check that the socket URL in `src/services/socket.js` matches your backend address |
+| EAS build fails | Run `npx eas-cli login` and ensure you're in the `firstbodis-organization` Expo org |
+| iOS build credentials error | Run the build interactively (not with `--non-interactive`) to set up Apple credentials |
+| "Expo Go not recommended" warning | Safe to ignore for dev; production builds use native runtime |
 
 ## License
 
