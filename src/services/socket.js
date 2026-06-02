@@ -1,7 +1,8 @@
 import { io } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SOCKET_BASE_URL } from '@env';
 
-const API_BASE = 'http://10.0.2.2:5000';
+const API_BASE = SOCKET_BASE_URL || 'http://10.0.2.2:5000';
 let socket = null;
 
 export const connectSocket = async () => {
