@@ -9,17 +9,26 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "API_BASE_URL": "https://carribubackend-production.up.railway.app/api"
       }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "API_BASE_URL": "https://carribubackend-production.up.railway.app/api"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "API_BASE_URL": "https://carribubackend-production.up.railway.app/api"
       }
     }
   },
