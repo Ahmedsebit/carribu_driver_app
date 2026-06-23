@@ -20,6 +20,11 @@
     },
     "android": {
       "package": "com.carribu.driver",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBJmKq7c0Kh-CcseZYlBPLeqbfiqWZdYO4"
+        }
+      },
       "permissions": [
         "ACCESS_FINE_LOCATION"
       ]

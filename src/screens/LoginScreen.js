@@ -46,9 +46,6 @@ const LoginScreen = () => {
         <TouchableOpacity style={s.btn} onPress={handleLogin} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Sign In</Text>}
         </TouchableOpacity>
-        <View style={s.demo}>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: '#1d4ed8' }}>Demo: driver1@nairobiacademy.co.ke / driver123</Text>
-        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -62,7 +59,6 @@ const s = StyleSheet.create({
   input: { width: '100%', backgroundColor: '#f3f4f6', borderRadius: 12, padding: 14, fontSize: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e5e7eb', color: '#111827' },
   btn: { width: '100%', backgroundColor: '#2563eb', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  demo: { marginTop: 20, backgroundColor: '#eff6ff', borderRadius: 12, padding: 12, width: '100%' },
 });
 
 export default LoginScreen;

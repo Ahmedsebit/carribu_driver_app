@@ -13,6 +13,7 @@ const TripScreen = () => {
   const [actionLoading, setActionLoading] = useState(null);
   const [locationStatus, setLocationStatus] = useState('waiting');
   const [broadcasting, setBroadcasting] = useState(false);
+  const [skippedStops, setSkippedStops] = useState([]);
   const locationSubscription = useRef(null);
 
   const fetchData = useCallback(async () => {
@@ -31,9 +32,66 @@ const TripScreen = () => {
     }
   }, []);
 
+  // Compute the next stop locally based on trip type:
+  // - Pickup trips: navigate to next pending student's pickup location
+  // - Dropoff trips: navigate to next on_bus student's dropoff location
+  // After "Arrived" is pressed, skip that student for navigation
+  const getNextStop = () => {
+    if (!activeTrip?.pickupList) return null;
+    const isDropoff = activeTrip.type === 'afternoon_dropoff';
+
+    if (isDropoff) {
+      // For drop-off: find next on_bus student not yet arrived at
+      const next = activeTrip.pickupList.find(
+        (s) => s.status === 'on_bus' && !skippedStops.includes(s.studentId)
+      );
+      if (!next) return null;
+      return {
+        ...next,
+        address: next.dropoffAddress || next.pickupAddress,
+        lat: next.dropoffLat || next.pickupLat,
+        lng: next.dropoffLng || next.pickupLng,
+        phase: 'dropoff',
+      };
+    } else {
+      // For pickup: find next pending student not yet arrived at
+      const next = activeTrip.pickupList.find(
+        (s) => s.status === 'pending' && !skippedStops.includes(s.studentId)
+      );
+      if (next) {
+        return {
+          ...next,
+          address: next.pickupAddress,
+          lat: next.pickupLat,
+          lng: next.pickupLng,
+          phase: 'pickup',
+        };
+      }
+      // If no more pending, switch to drop-off phase for on_bus students
+      const nextDropoff = activeTrip.pickupList.find(
+        (s) => s.status === 'on_bus' && !skippedStops.includes(s.studentId)
+      );
+      if (!nextDropoff) return null;
+      return {
+        ...nextDropoff,
+        address: nextDropoff.dropoffAddress || nextDropoff.pickupAddress,
+        lat: nextDropoff.dropoffLat || nextDropoff.pickupLat,
+        lng: nextDropoff.dropoffLng || nextDropoff.pickupLng,
+        phase: 'dropoff',
+      };
+    }
+  };
+
+  const nextStop = activeTrip ? getNextStop() : null;
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Reset skipped stops when active trip changes
+  useEffect(() => {
+    setSkippedStops([]);
+  }, [activeTrip?.id]);
 
   useEffect(() => {
     if (activeTrip) {
@@ -144,6 +202,14 @@ const TripScreen = () => {
     setActionLoading(`${studentId}-${action}`);
     try {
       await tripAPI.logAction(tripId, { studentId, action });
+      // When driver arrives at a stop, move to next student immediately
+      if (action === 'arrived') {
+        setSkippedStops((prev) => [...prev, studentId]);
+      }
+      // When status actually changes, remove from skipped list
+      if (action === 'check_in' || action === 'absent' || action === 'check_out') {
+        setSkippedStops((prev) => prev.filter((id) => id !== studentId));
+      }
       Alert.alert('✅', `${name}: ${action}`);
       fetchData();
     } catch (e) {
@@ -192,20 +258,22 @@ const TripScreen = () => {
               ))}
             </View>
           )}
-          {activeTrip.nextPickup && (
-            <View style={{ backgroundColor: '#fef3c7', borderRadius: 10, padding: 12, marginTop: 12 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#92400e' }}>📍 NEXT STOP</Text>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#78350f' }}>
-                #{activeTrip.nextPickup.stopNumber} {activeTrip.nextPickup.studentName}
+          {nextStop && (
+            <View style={{ backgroundColor: nextStop.phase === 'dropoff' ? '#dbeafe' : '#fef3c7', borderRadius: 10, padding: 12, marginTop: 12 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: nextStop.phase === 'dropoff' ? '#1e40af' : '#92400e' }}>
+                {nextStop.phase === 'dropoff' ? '📤 NEXT DROP-OFF' : '📍 NEXT PICKUP'}
               </Text>
-              <Text style={{ fontSize: 13, color: '#92400e', marginBottom: 8 }}>{activeTrip.nextPickup.pickupAddress || 'No address'}</Text>
-              {activeTrip.nextPickup.pickupLat && activeTrip.nextPickup.pickupLng ? (
+              <Text style={{ fontSize: 16, fontWeight: '700', color: nextStop.phase === 'dropoff' ? '#1e3a8a' : '#78350f' }}>
+                #{nextStop.stopNumber} {nextStop.studentName}
+              </Text>
+              <Text style={{ fontSize: 13, color: nextStop.phase === 'dropoff' ? '#1e40af' : '#92400e', marginBottom: 8 }}>{nextStop.address || 'No address'}</Text>
+              {nextStop.lat && nextStop.lng ? (
                 <View style={{ borderRadius: 10, overflow: 'hidden', height: 160 }}>
                   <MapView
                     style={{ flex: 1 }}
                     initialRegion={{
-                      latitude: activeTrip.nextPickup.pickupLat,
-                      longitude: activeTrip.nextPickup.pickupLng,
+                      latitude: nextStop.lat,
+                      longitude: nextStop.lng,
                       latitudeDelta: 0.005,
                       longitudeDelta: 0.005,
                     }}
@@ -214,20 +282,19 @@ const TripScreen = () => {
                   >
                     <Marker
                       coordinate={{
-                        latitude: activeTrip.nextPickup.pickupLat,
-                        longitude: activeTrip.nextPickup.pickupLng,
+                        latitude: nextStop.lat,
+                        longitude: nextStop.lng,
                       }}
-                      title={activeTrip.nextPickup.studentName}
-                      description={activeTrip.nextPickup.pickupAddress}
+                      title={nextStop.studentName}
+                      description={nextStop.address}
                     />
                   </MapView>
                   <TouchableOpacity
                     style={{ position: 'absolute', bottom: 8, right: 8, backgroundColor: '#2563eb', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
                     onPress={() => {
-                      const { pickupLat, pickupLng, pickupAddress } = activeTrip.nextPickup;
                       const url = Platform.select({
-                        android: `google.navigation:q=${pickupLat},${pickupLng}`,
-                        ios: `maps://app?daddr=${pickupLat},${pickupLng}`,
+                        android: `google.navigation:q=${nextStop.lat},${nextStop.lng}`,
+                        ios: `maps://app?daddr=${nextStop.lat},${nextStop.lng}`,
                       });
                       Linking.openURL(url);
                     }}
@@ -269,8 +336,8 @@ const TripScreen = () => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} />}
           ListHeaderComponent={<Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 12 }}>🎒 Pickup List ({activeTrip.pickupList?.length || 0})</Text>}
           renderItem={({ item }) => {
-            const colors = { pending: '#f59e0b', on_bus: '#2563eb', dropped_off: '#16a34a', absent: '#dc2626' };
-            const labels = { pending: '⏳ Pending', on_bus: '🚌 On Bus', dropped_off: '✅ Done', absent: '❌ Absent' };
+            const colors = { pending: '#f59e0b', arrived: '#f97316', on_bus: '#2563eb', dropped_off: '#16a34a', absent: '#dc2626' };
+            const labels = { pending: '⏳ Pending', arrived: '📍 Arrived', on_bus: '🚌 On Bus', dropped_off: '✅ Done', absent: '❌ Absent' };
             return (
               <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: colors[item.status] }}>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
@@ -303,10 +370,25 @@ const TripScreen = () => {
                     </TouchableOpacity>
                   </View>
                 )}
+                {item.status === 'arrived' && (
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                    <TouchableOpacity style={{ flex: 1, backgroundColor: '#2563eb', borderRadius: 10, padding: 12, alignItems: 'center' }} onPress={() => handleAction(activeTrip.id, item.studentId, 'check_in', item.studentName)}>
+                      <Text style={{ color: '#fff', fontWeight: '600' }}>📥 Pick Up</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={{ flex: 1, backgroundColor: '#dc2626', borderRadius: 10, padding: 12, alignItems: 'center' }} onPress={() => handleAction(activeTrip.id, item.studentId, 'absent', item.studentName)}>
+                      <Text style={{ color: '#fff', fontWeight: '600' }}>❌ Absent</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 {item.status === 'on_bus' && (
-                  <TouchableOpacity style={{ backgroundColor: '#16a34a', borderRadius: 10, padding: 12, alignItems: 'center', marginTop: 12 }} onPress={() => handleAction(activeTrip.id, item.studentId, 'check_out', item.studentName)}>
-                    <Text style={{ color: '#fff', fontWeight: '600' }}>📤 Drop Off</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                    <TouchableOpacity style={{ flex: 1, backgroundColor: '#f59e0b', borderRadius: 10, padding: 12, alignItems: 'center' }} onPress={() => handleAction(activeTrip.id, item.studentId, 'arrived', item.studentName)}>
+                      <Text style={{ color: '#fff', fontWeight: '600' }}>📍 Arrived</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={{ flex: 1, backgroundColor: '#16a34a', borderRadius: 10, padding: 12, alignItems: 'center' }} onPress={() => handleAction(activeTrip.id, item.studentId, 'check_out', item.studentName)}>
+                      <Text style={{ color: '#fff', fontWeight: '600' }}>📤 Drop Off</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
             );
