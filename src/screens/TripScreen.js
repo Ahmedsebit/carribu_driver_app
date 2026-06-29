@@ -20,7 +20,7 @@ const TripScreen = () => {
     try {
       const [a, t] = await Promise.all([
         driverAPI.getActiveTrip(),
-        driverAPI.getMyTrips(new Date().toISOString().split('T')[0]),
+        driverAPI.getMyTrips(),
       ]);
       setActiveTrip(a.data.activeTrip);
       setTodayTrips(t.data.trips);
@@ -400,12 +400,13 @@ const TripScreen = () => {
           keyExtractor={(i) => String(i.id)}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} />}
-          ListHeaderComponent={<Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 12 }}>📅 Today's Trips</Text>}
+          ListHeaderComponent={<Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 12 }}>📅 Scheduled Trips</Text>}
           renderItem={({ item }) => (
             <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 16, fontWeight: '600' }}>{item.route?.name}</Text>
                 <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{item.vehicle?.plateNumber} • {item.type === 'morning_pickup' ? '🌅 Morning' : '🌇 Afternoon'} • {item.pickupList?.length || 0} students</Text>
+                {item.scheduledDate ? <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>🗓 {item.scheduledDate}</Text> : null}
                 <Text style={{ fontSize: 12, fontWeight: '600', color: item.status === 'completed' ? '#16a34a' : item.status === 'scheduled' ? '#f59e0b' : '#2563eb', marginTop: 4 }}>{item.status.replace('_', ' ').toUpperCase()}</Text>
               </View>
               {item.status === 'scheduled' && (
