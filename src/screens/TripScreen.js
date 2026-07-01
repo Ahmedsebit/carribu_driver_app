@@ -98,7 +98,7 @@ const TripScreen = () => {
       const i = setInterval(fetchData, 30000);
       return () => clearInterval(i);
     }
-  }, [activeTrip, fetchData]);
+  }, [activeTrip?.id, fetchData]);
 
   useEffect(() => {
     let isMounted = true;
@@ -130,7 +130,7 @@ const TripScreen = () => {
       joinTrip(activeTrip.id);
 
       try {
-        locationSubscription.current = await Location.watchPositionAsync(
+        const subscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Highest,
             timeInterval: 5000,
@@ -150,6 +150,13 @@ const TripScreen = () => {
             }
           }
         );
+        // If the effect was torn down while awaiting the subscription, remove
+        // it immediately so we never leak a native GPS watcher.
+        if (!isMounted) {
+          subscription.remove();
+          return;
+        }
+        locationSubscription.current = subscription;
       } catch (err) {
         console.warn('Location subscription failed', err?.message || err);
         setLocationStatus('error');
@@ -161,7 +168,7 @@ const TripScreen = () => {
       isMounted = false;
       cleanup();
     };
-  }, [activeTrip]);
+  }, [activeTrip?.id]);
 
   const handleStart = (id) =>
     Alert.alert('Start Trip', 'Ready?', [
