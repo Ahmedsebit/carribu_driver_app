@@ -24,7 +24,7 @@ const LoginScreen = () => {
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={s.card}>
         <Text style={{ fontSize: 48 }}>🚐</Text>
-        <Text style={s.title}>Driver App</Text>
+        <Text style={s.title}>Carribu Driver</Text>
         <Text style={s.sub}>School Transport Management</Text>
         <TextInput
           style={s.input}
