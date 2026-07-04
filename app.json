@@ -44,6 +44,11 @@
         "projectId": "deedde0b-7d63-4f67-a26f-be7d15a5c7b6"
       }
     },
+    "plugins": [
+      ["expo-notifications", {
+        "color": "#16a34a"
+      }]
+    ],
     "owner": "firstbodis-organization"
   }
 }
