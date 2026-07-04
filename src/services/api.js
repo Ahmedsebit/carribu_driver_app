@@ -16,7 +16,7 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-export const authAPI = { login: (d) => api.post('/auth/login', d), getMe: () => api.get('/auth/me'), changePassword: (d) => api.put('/auth/change-password', d) };
+export const authAPI = { login: (d) => api.post('/auth/login', d), getMe: () => api.get('/auth/me'), changePassword: (d) => api.put('/auth/change-password', d), savePushToken: (token) => api.put('/auth/push-token', { pushToken: token }) };
 export const driverAPI = {
   getMyRoutes: () => api.get('/driver/my-routes'),
   getMyTrips: (d) => api.get('/driver/my-trips', { params: { date: d } }),

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI } from '../services/api';
+import { registerForPushNotificationsAsync, unregisterPushNotificationsAsync } from '../services/push';
 
 const AuthContext = createContext(null);
 
@@ -19,6 +20,7 @@ export const AuthProvider = ({ children }) => {
           const parsedUser = JSON.parse(u);
           setUser(parsedUser);
           console.log('AuthContext: User set', parsedUser.email);
+          registerForPushNotificationsAsync();
         }
       } catch (e) {
         console.error('AuthContext: Error during auth check', e);
@@ -37,10 +39,12 @@ export const AuthProvider = ({ children }) => {
     await AsyncStorage.setItem('token', data.token);
     await AsyncStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);
+    registerForPushNotificationsAsync();
     return data;
   };
 
   const logout = async () => {
+    await unregisterPushNotificationsAsync();
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
     setUser(null);
