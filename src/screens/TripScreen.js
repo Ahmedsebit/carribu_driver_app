@@ -38,6 +38,9 @@ const TripScreen = () => {
   // After "Arrived" is pressed, skip that student for navigation
   const getNextStop = () => {
     if (!activeTrip?.pickupList) return null;
+    // react-native-maps requires numeric lat/lng; the API returns DECIMAL
+    // columns as strings, which crashes the native map. Coerce to Number.
+    const toNum = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
     const isDropoff = activeTrip.type === 'afternoon_dropoff';
 
     if (isDropoff) {
@@ -49,8 +52,8 @@ const TripScreen = () => {
       return {
         ...next,
         address: next.dropoffAddress || next.pickupAddress,
-        lat: next.dropoffLat || next.pickupLat,
-        lng: next.dropoffLng || next.pickupLng,
+        lat: toNum(next.dropoffLat ?? next.pickupLat),
+        lng: toNum(next.dropoffLng ?? next.pickupLng),
         phase: 'dropoff',
       };
     } else {
@@ -62,8 +65,8 @@ const TripScreen = () => {
         return {
           ...next,
           address: next.pickupAddress,
-          lat: next.pickupLat,
-          lng: next.pickupLng,
+          lat: toNum(next.pickupLat),
+          lng: toNum(next.pickupLng),
           phase: 'pickup',
         };
       }
@@ -75,8 +78,8 @@ const TripScreen = () => {
       return {
         ...nextDropoff,
         address: nextDropoff.dropoffAddress || nextDropoff.pickupAddress,
-        lat: nextDropoff.dropoffLat || nextDropoff.pickupLat,
-        lng: nextDropoff.dropoffLng || nextDropoff.pickupLng,
+        lat: toNum(nextDropoff.dropoffLat ?? nextDropoff.pickupLat),
+        lng: toNum(nextDropoff.dropoffLng ?? nextDropoff.pickupLng),
         phase: 'dropoff',
       };
     }
