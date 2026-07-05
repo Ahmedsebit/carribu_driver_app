@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, TextInput, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
 
@@ -88,10 +88,16 @@ const ProfileScreen = () => {
 
       <TouchableOpacity
         style={{ backgroundColor: '#dc2626', borderRadius: 14, padding: 16, alignItems: 'center' }}
-        onPress={() => Alert.alert('Logout', 'Sure?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Logout', style: 'destructive', onPress: logout },
-        ])}
+        onPress={() => {
+          if (Platform.OS === 'web') {
+            if (window.confirm('Log out of Carribu?')) logout();
+          } else {
+            Alert.alert('Logout', 'Sure?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Logout', style: 'destructive', onPress: logout },
+            ]);
+          }
+        }}
       >
         <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>🚪 Logout</Text>
       </TouchableOpacity>
