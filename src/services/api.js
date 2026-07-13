@@ -21,6 +21,7 @@ export const driverAPI = {
   getMyRoutes: () => api.get('/driver/my-routes'),
   getMyTrips: (d) => api.get('/driver/my-trips', { params: { date: d } }),
   getActiveTrip: () => api.get('/driver/active-trip'),
+  getTripHistory: (days = 30) => api.get('/driver/trip-history', { params: { days } }),
 };
 export const tripAPI = {
   startTrip: (id) => api.put(`/trips/${id}/start`),
