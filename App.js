@@ -7,13 +7,14 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import LoginScreen from './src/screens/LoginScreen';
 import TripScreen from './src/screens/TripScreen';
 import RoutesScreen from './src/screens/RoutesScreen';
+import HistoryScreen from './src/screens/HistoryScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import { View, Text, ActivityIndicator } from 'react-native';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
-const icons = { Trip: '🚌', Routes: '🗺️', Chat: '💬', Profile: '👤' };
+const icons = { Trip: '🚌', Routes: '🗺️', History: '🕘', Chat: '💬', Profile: '👤' };
 
 function MainTabs() {
   return (
@@ -30,6 +31,7 @@ function MainTabs() {
     >
       <Tab.Screen name="Trip" component={TripScreen} options={{ headerTitle: 'Trip Management' }} />
       <Tab.Screen name="Routes" component={RoutesScreen} options={{ headerTitle: 'My Routes' }} />
+      <Tab.Screen name="History" component={HistoryScreen} options={{ headerTitle: 'Trip History' }} />
       <Tab.Screen name="Chat" component={ChatScreen} options={{ headerTitle: 'Messages' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ headerTitle: 'My Profile' }} />
     </Tab.Navigator>
