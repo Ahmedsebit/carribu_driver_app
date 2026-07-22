@@ -417,7 +417,7 @@ const TripScreen = () => {
                 <Text style={{ fontSize: 16, fontWeight: '600' }}>{item.route?.name}</Text>
                 <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{item.vehicle?.plateNumber} • {item.type === 'morning_pickup' ? '🌅 Morning' : '🌇 Afternoon'} • {item.pickupList?.length || 0} students</Text>
                 {item.scheduledDate ? <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>🗓 {item.scheduledDate}</Text> : null}
-                <Text style={{ fontSize: 12, fontWeight: '600', color: item.status === 'completed' ? '#16a34a' : item.status === 'scheduled' ? '#f59e0b' : '#2563eb', marginTop: 4 }}>{item.status.replace('_', ' ').toUpperCase()}</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: item.status === 'completed' ? '#16a34a' : item.status === 'scheduled' ? '#f59e0b' : item.status === 'missed' ? '#dc2626' : '#2563eb', marginTop: 4 }}>{item.status === 'missed' ? '⚠️ NOT STARTED' : item.status.replace('_', ' ').toUpperCase()}</Text>
               </View>
               {item.status === 'scheduled' && (
                 <TouchableOpacity style={{ backgroundColor: '#16a34a', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 12 }} onPress={() => handleStart(item.id)}>
