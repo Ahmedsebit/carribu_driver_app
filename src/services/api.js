@@ -25,6 +25,7 @@ export const driverAPI = {
 };
 export const tripAPI = {
   startTrip: (id) => api.put(`/trips/${id}/start`),
+  acknowledgeTrip: (id) => api.put(`/trips/${id}/acknowledge`),
   endTrip: (id) => api.put(`/trips/${id}/end`),
   logAction: (id, d) => api.post(`/trips/${id}/log`, d),
 };

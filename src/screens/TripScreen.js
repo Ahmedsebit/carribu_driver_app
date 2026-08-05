@@ -91,6 +91,34 @@ const TripScreen = () => {
     fetchData();
   }, [fetchData]);
 
+  // Listen for server-pushed trip lifecycle events so the driver is prompted in
+  // real time: a reminder shortly before the scheduled start, a delayed alert
+  // once the start time passes unacknowledged, and a missed alert once the
+  // start window lapses. Refresh the list on each so statuses/buttons update.
+  useEffect(() => {
+    let mounted = true;
+    let sockRef = null;
+    const onReminder = (d) => { Alert.alert('⏰ Trip Starting Soon', d?.message || 'A trip is about to start. Acknowledge it to begin.'); fetchData(); };
+    const onDelayed = (d) => { Alert.alert('⏱️ Trip Delayed', d?.message || 'A trip is past its start time. Acknowledge it as soon as possible.'); fetchData(); };
+    const onMissed = (d) => { Alert.alert('⚠️ Trip Not Started', d?.message || 'A trip was not started in time and is now marked as missed.'); fetchData(); };
+    (async () => {
+      const sock = await connectSocket();
+      if (!sock || !mounted) return;
+      sockRef = sock;
+      sock.on('trip-reminder', onReminder);
+      sock.on('trip-delayed', onDelayed);
+      sock.on('trip-missed', onMissed);
+    })();
+    return () => {
+      mounted = false;
+      if (sockRef) {
+        sockRef.off('trip-reminder', onReminder);
+        sockRef.off('trip-delayed', onDelayed);
+        sockRef.off('trip-missed', onMissed);
+      }
+    };
+  }, [fetchData]);
+
   // Reset skipped stops when active trip changes
   useEffect(() => {
     setSkippedStops([]);
@@ -173,15 +201,15 @@ const TripScreen = () => {
     };
   }, [activeTrip?.id]);
 
-  const handleStart = (id) =>
-    Alert.alert('Start Trip', 'Ready?', [
+  const handleAcknowledge = (id) =>
+    Alert.alert('Acknowledge & Start Trip', 'Acknowledge this trip? It will officially start and parents will be notified.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Start',
+        text: 'Acknowledge & Start',
         onPress: async () => {
           try {
-            await tripAPI.startTrip(id);
-            Alert.alert('✅', 'Trip started!');
+            await tripAPI.acknowledgeTrip(id);
+            Alert.alert('✅', 'Trip acknowledged and started!');
             fetchData();
           } catch (e) {
             Alert.alert('Error', e.response?.data?.error || 'Failed');
@@ -417,11 +445,11 @@ const TripScreen = () => {
                 <Text style={{ fontSize: 16, fontWeight: '600' }}>{item.route?.name}</Text>
                 <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{item.vehicle?.plateNumber} • {item.type === 'morning_pickup' ? '🌅 Morning' : '🌇 Afternoon'} • {item.pickupList?.length || 0} students</Text>
                 {item.scheduledDate ? <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>🗓 {item.scheduledDate}</Text> : null}
-                <Text style={{ fontSize: 12, fontWeight: '600', color: item.status === 'completed' ? '#16a34a' : item.status === 'scheduled' ? '#f59e0b' : item.status === 'missed' ? '#dc2626' : '#2563eb', marginTop: 4 }}>{item.status === 'missed' ? '⚠️ NOT STARTED' : item.status.replace('_', ' ').toUpperCase()}</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: item.status === 'completed' ? '#16a34a' : item.status === 'scheduled' ? '#f59e0b' : item.status === 'delayed' ? '#ea580c' : item.status === 'missed' ? '#dc2626' : '#2563eb', marginTop: 4 }}>{item.status === 'missed' ? '⚠️ NOT STARTED' : item.status === 'delayed' ? '⏱️ DELAYED' : item.status.replace('_', ' ').toUpperCase()}</Text>
               </View>
-              {item.status === 'scheduled' && (
-                <TouchableOpacity style={{ backgroundColor: '#16a34a', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 12 }} onPress={() => handleStart(item.id)}>
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>▶ Start</Text>
+              {(item.status === 'scheduled' || item.status === 'delayed') && (
+                <TouchableOpacity style={{ backgroundColor: item.status === 'delayed' ? '#ea580c' : '#16a34a', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12 }} onPress={() => handleAcknowledge(item.id)}>
+                  <Text style={{ color: '#fff', fontWeight: '700' }}>✔ Acknowledge & Start</Text>
                 </TouchableOpacity>
               )}
             </View>
