@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI } from '../services/api';
 import { registerForPushNotificationsAsync, unregisterPushNotificationsAsync } from '../services/push';
+import { stopBackgroundLocationAsync } from '../services/backgroundLocation';
 
 const AuthContext = createContext(null);
 
@@ -44,6 +45,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    try {
+      await stopBackgroundLocationAsync();
+    } catch (e) {
+      console.warn('Unable to stop background location during logout:', e?.message || e);
+    }
     await unregisterPushNotificationsAsync();
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');

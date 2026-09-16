@@ -34,6 +34,8 @@ export const messageAPI = {
   getConversations: () => api.get('/messages/conversations'),
   getThread: (id) => api.get(`/messages/thread/${id}`),
   send: (d) => api.post('/messages', d),
+  deleteMessage: (id) => api.delete(`/messages/${id}`),
+  clearThread: (partnerId) => api.delete(`/messages/thread/${partnerId}`),
   getUnreadCount: () => api.get('/messages/unread-count'),
   getRouteParents: (id) => api.get(`/messages/route-parents/${id}`),
 };

@@ -3,7 +3,11 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndi
 import * as Location from 'expo-location';
 import MapView, { Marker } from 'react-native-maps';
 import { driverAPI, tripAPI, locationAPI } from '../services/api';
-import { connectSocket, joinTrip, sendLocation, getSocket } from '../services/socket';
+import { connectSocket } from '../services/socket';
+import {
+  startBackgroundLocationAsync,
+  stopBackgroundLocationAsync,
+} from '../services/backgroundLocation';
 
 const TripScreen = () => {
   const [activeTrip, setActiveTrip] = useState(null);
@@ -134,70 +138,84 @@ const TripScreen = () => {
   useEffect(() => {
     let isMounted = true;
 
-    const cleanup = async () => {
+    const cleanupForegroundFallback = () => {
       if (locationSubscription.current) {
         locationSubscription.current.remove();
         locationSubscription.current = null;
       }
-      if (isMounted) {
-        setBroadcasting(false);
-        setLocationStatus('stopped');
+    };
+
+    const startForegroundFallback = async () => {
+      setBroadcasting(true);
+      const subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 5000,
+          distanceInterval: 10,
+        },
+        async (position) => {
+          const { latitude, longitude, speed, heading } = position.coords;
+          setLocationStatus('sending');
+          try {
+            await locationAPI.updateLocation({
+              tripId: activeTrip.id,
+              lat: latitude,
+              lng: longitude,
+              speed,
+              heading,
+            });
+            if (isMounted) setLocationStatus('foreground_only');
+          } catch (err) {
+            console.warn('Location update failed', err?.response?.data || err.message || err);
+            if (isMounted) setLocationStatus('error');
+          }
+        }
+      );
+      if (!isMounted) {
+        subscription.remove();
+        return;
       }
+      locationSubscription.current = subscription;
     };
 
     const startLocationBroadcast = async () => {
-      if (!activeTrip) return;
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (!isMounted) return;
-      if (status !== 'granted') {
-        setLocationStatus('permission_denied');
+      if (!activeTrip) {
+        try {
+          await stopBackgroundLocationAsync();
+        } catch (err) {
+          console.warn('Unable to stop background location:', err?.message || err);
+        }
+        if (isMounted) {
+          setBroadcasting(false);
+          setLocationStatus('stopped');
+        }
         return;
       }
-      setLocationStatus('granted');
-      setBroadcasting(true);
-
-      // Connect socket and join trip room
-      await connectSocket();
-      joinTrip(activeTrip.id);
 
       try {
-        const subscription = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.Highest,
-            timeInterval: 5000,
-            distanceInterval: 10,
-          },
-          async (position) => {
-            const { latitude, longitude, speed, heading } = position.coords;
-            setLocationStatus('sending');
-            try {
-              // Send via socket (real-time) and REST (persistence)
-              sendLocation(activeTrip.id, latitude, longitude, speed, heading);
-              await locationAPI.updateLocation({ tripId: activeTrip.id, lat: latitude, lng: longitude, speed, heading });
-              setLocationStatus('live');
-            } catch (err) {
-              console.warn('Location update failed', err?.response?.data || err.message || err);
-              setLocationStatus('error');
-            }
-          }
-        );
-        // If the effect was torn down while awaiting the subscription, remove
-        // it immediately so we never leak a native GPS watcher.
-        if (!isMounted) {
-          subscription.remove();
-          return;
+        const result = await startBackgroundLocationAsync(activeTrip.id);
+        if (!isMounted) return;
+
+        if (result.started) {
+          setBroadcasting(true);
+          setLocationStatus('background_live');
+        } else if (result.reason === 'background_permission_denied') {
+          setLocationStatus('background_permission_denied');
+          await startForegroundFallback();
+        } else {
+          setBroadcasting(false);
+          setLocationStatus('permission_denied');
         }
-        locationSubscription.current = subscription;
       } catch (err) {
-        console.warn('Location subscription failed', err?.message || err);
-        setLocationStatus('error');
+        console.warn('Location broadcast failed', err?.message || err);
+        if (isMounted) setLocationStatus('error');
       }
     };
 
     startLocationBroadcast();
     return () => {
       isMounted = false;
-      cleanup();
+      cleanupForegroundFallback();
     };
   }, [activeTrip?.id]);
 
@@ -227,6 +245,7 @@ const TripScreen = () => {
         onPress: async () => {
           try {
             await tripAPI.endTrip(id);
+            await stopBackgroundLocationAsync();
             Alert.alert('✅', 'Trip completed!');
             fetchData();
           } catch (e) {
@@ -251,7 +270,7 @@ const TripScreen = () => {
       Alert.alert('✅', `${name}: ${action}`);
       fetchData();
     } catch (e) {
-      Alert.alert('Error', e.message);
+      Alert.alert('Error', e.response?.data?.error || e.message);
     } finally {
       setActionLoading(null);
     }
@@ -351,10 +370,14 @@ const TripScreen = () => {
             <Text style={{ fontSize: 12, color: '#0c4a6e', marginTop: 4 }}>
               {locationStatus === 'permission_denied'
                 ? 'Location permission required.'
+                : locationStatus === 'background_permission_denied'
+                ? 'Allow background location to keep sharing when the app is minimized.'
                 : locationStatus === 'sending'
                 ? 'Updating...'
-                : locationStatus === 'live'
-                ? 'Live location active.'
+                : locationStatus === 'background_live'
+                ? 'Live location remains active in the background.'
+                : locationStatus === 'foreground_only'
+                ? 'Live only while the app is open. Allow background location in Settings.'
                 : locationStatus === 'error'
                 ? 'Unable to send location.'
                 : 'Permission status: ' + locationStatus}
