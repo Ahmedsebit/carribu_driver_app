@@ -45,6 +45,13 @@
       }
     },
     "plugins": [
+      ["expo-location", {
+        "locationAlwaysAndWhenInUsePermission": "Allow Carribu Driver to share your location during active school trips.",
+        "locationWhenInUsePermission": "Allow Carribu Driver to use your location during active school trips.",
+        "isAndroidBackgroundLocationEnabled": true,
+        "isAndroidForegroundServiceEnabled": true,
+        "isIosBackgroundLocationEnabled": true
+      }],
       ["expo-notifications", {
         "color": "#16a34a"
       }]

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { messageAPI, driverAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { connectSocket, sendChatMessage, getSocket } from '../services/socket';
@@ -74,6 +74,38 @@ const ChatScreen = () => {
     }
   };
 
+  const deleteMessage = (item) => Alert.alert('Remove message?', 'This only removes the message from your account.', [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Remove',
+      style: 'destructive',
+      onPress: async () => {
+        try {
+          await messageAPI.deleteMessage(item.id);
+          setMsgs(current => current.filter(message => message.id !== item.id));
+        } catch (e) {
+          Alert.alert('Error', e.response?.data?.error || 'Failed to remove message.');
+        }
+      },
+    },
+  ]);
+
+  const clearConversation = () => Alert.alert('Clear conversation?', 'The other participant will still keep their copy.', [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Clear',
+      style: 'destructive',
+      onPress: async () => {
+        try {
+          await messageAPI.clearThread(partner.partnerId);
+          setMsgs([]);
+        } catch (e) {
+          Alert.alert('Error', e.response?.data?.error || 'Failed to clear conversation.');
+        }
+      },
+    },
+  ]);
+
   useEffect(() => {
     if (partner) {
       let handler;
@@ -119,10 +151,13 @@ const ChatScreen = () => {
           <TouchableOpacity onPress={() => { setPartner(null); fetchConvos(); }}>
             <Text style={{ color: '#93c5fd', fontWeight: '600' }}>← Back</Text>
           </TouchableOpacity>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{partner.partnerName}</Text>
             <Text style={{ color: '#bfdbfe', fontSize: 12, textTransform: 'capitalize' }}>{partner.partnerRole}</Text>
           </View>
+          <TouchableOpacity onPress={clearConversation}>
+            <Text style={{ color: '#fff', fontWeight: '600' }}>Clear</Text>
+          </TouchableOpacity>
         </View>
         <FlatList
           ref={ref}
@@ -133,13 +168,16 @@ const ChatScreen = () => {
           renderItem={({ item }) => {
             const mine = item.senderId === user.id;
             return (
-              <View style={{ maxWidth: '80%', borderRadius: 16, padding: 12, marginBottom: 8, backgroundColor: mine ? '#2563eb' : '#fff', alignSelf: mine ? 'flex-end' : 'flex-start' }}>
+              <TouchableOpacity onLongPress={() => deleteMessage(item)} style={{ maxWidth: '80%', borderRadius: 16, padding: 12, marginBottom: 8, backgroundColor: mine ? '#2563eb' : '#fff', alignSelf: mine ? 'flex-end' : 'flex-start' }}>
                 {item.messageType === 'absence' && <Text style={{ fontSize: 11, fontWeight: '600', color: '#fbbf24', marginBottom: 4 }}>⚠️ Absence Alert</Text>}
                 <Text style={{ fontSize: 14, color: mine ? '#fff' : '#111827' }}>{item.content}</Text>
-                <Text style={{ fontSize: 10, marginTop: 4, color: mine ? '#bfdbfe' : '#9ca3af' }}>
-                  {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <Text style={{ fontSize: 10, marginTop: 4, color: mine ? '#bfdbfe' : '#9ca3af' }}>
+                    {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                  <TouchableOpacity onPress={() => deleteMessage(item)}><Text style={{ fontSize: 13 }}>🗑️</Text></TouchableOpacity>
+                </View>
+              </TouchableOpacity>
             );
           }}
           ListEmptyComponent={

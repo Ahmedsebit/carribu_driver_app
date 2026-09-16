@@ -11,6 +11,7 @@ import HistoryScreen from './src/screens/HistoryScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import { View, Text, ActivityIndicator } from 'react-native';
+import './src/services/backgroundLocation';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
