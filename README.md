@@ -6,9 +6,24 @@ A React Native (Expo) mobile application for school transport drivers. Part of t
 
 - **Trip Management** – Start/end trips, log pickup and drop-off actions
 - **Route Viewing** – View assigned routes and stops
-- **Real-time Location** – Share live GPS location with parents via WebSocket
+- **Real-time Location** – Linked vehicles use their Traccar device; unlinked vehicles share driver-phone GPS
 - **Messaging** – In-app chat with parents and coordinators
 - **Authentication** – Secure JWT-based login for drivers and coordinators
+
+## Trip location source
+
+For active trips with `locationSource=traccar` or a linked vehicle identifier,
+the app stops phone location sharing and does not request GPS permissions.
+If a tracker is linked while an older background task is running, the backend
+returns `TRACCAR_LOCATION_REQUIRED` and the task shuts down. There is no
+automatic phone-GPS fallback when a linked device is offline. Vehicles without
+a tracker retain phone-based background/foreground sharing.
+
+Background-location regression checks run locally without a device:
+
+```powershell
+node --test .\tests\backgroundLocation.test.cjs
+```
 
 ## Tech Stack
 
