@@ -23,11 +23,12 @@ TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
       tripId,
       lat: latitude,
       lng: longitude,
-      speed,
+      speed: speed == null || speed < 0 ? null : speed * 3.6,
       heading,
     });
   } catch (err) {
-    if (err?.response?.status === 404) {
+    if (err?.response?.status === 404 || err?.response?.data?.code === 'TRACCAR_LOCATION_REQUIRED') {
+      console.log('Stopping phone GPS sharing: trip ended or the linked Traccar device is authoritative.');
       await stopBackgroundLocationAsync();
       return;
     }

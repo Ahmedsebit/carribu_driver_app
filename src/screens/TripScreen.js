@@ -19,6 +19,7 @@ const TripScreen = () => {
   const [broadcasting, setBroadcasting] = useState(false);
   const [skippedStops, setSkippedStops] = useState([]);
   const locationSubscription = useRef(null);
+  const usesTraccar = activeTrip?.locationSource === 'traccar' || Boolean(activeTrip?.vehicle?.trackerUniqueId);
 
   const fetchData = useCallback(async () => {
     try {
@@ -154,6 +155,7 @@ const TripScreen = () => {
           distanceInterval: 10,
         },
         async (position) => {
+          if (!isMounted) return;
           const { latitude, longitude, speed, heading } = position.coords;
           setLocationStatus('sending');
           try {
@@ -161,11 +163,20 @@ const TripScreen = () => {
               tripId: activeTrip.id,
               lat: latitude,
               lng: longitude,
-              speed,
+              speed: speed == null || speed < 0 ? null : speed * 3.6,
               heading,
             });
             if (isMounted) setLocationStatus('foreground_only');
           } catch (err) {
+            if (err?.response?.data?.code === 'TRACCAR_LOCATION_REQUIRED') {
+              cleanupForegroundFallback();
+              if (isMounted) {
+                setBroadcasting(false);
+                setLocationStatus('traccar');
+              }
+              fetchData();
+              return;
+            }
             console.warn('Location update failed', err?.response?.data || err.message || err);
             if (isMounted) setLocationStatus('error');
           }
@@ -179,15 +190,17 @@ const TripScreen = () => {
     };
 
     const startLocationBroadcast = async () => {
-      if (!activeTrip) {
+      if (!activeTrip || usesTraccar) {
         try {
           await stopBackgroundLocationAsync();
         } catch (err) {
           console.warn('Unable to stop background location:', err?.message || err);
+          if (isMounted) setLocationStatus('error');
+          return;
         }
         if (isMounted) {
           setBroadcasting(false);
-          setLocationStatus('stopped');
+          setLocationStatus(usesTraccar ? 'traccar' : 'stopped');
         }
         return;
       }
@@ -217,7 +230,7 @@ const TripScreen = () => {
       isMounted = false;
       cleanupForegroundFallback();
     };
-  }, [activeTrip?.id]);
+  }, [activeTrip?.id, usesTraccar, fetchData]);
 
   const handleAcknowledge = (id) =>
     Alert.alert('Acknowledge & Start Trip', 'Acknowledge this trip? It will officially start and parents will be notified.', [
@@ -365,10 +378,16 @@ const TripScreen = () => {
           <View style={{ backgroundColor: '#e0f2fe', borderRadius: 10, padding: 12, marginTop: 12 }}>
             <Text style={{ fontSize: 12, fontWeight: '700', color: '#0c4a6e' }}>📡 Location Broadcast</Text>
             <Text style={{ fontSize: 14, fontWeight: '600', color: '#075985' }}>
-              {broadcasting ? 'Sending GPS updates to parents.' : 'Waiting for active trip...'}
+              {usesTraccar || locationStatus === 'traccar'
+                ? 'Location source: linked Traccar device.'
+                : broadcasting ? 'Sending GPS updates to parents.' : 'Waiting for active trip...'}
             </Text>
             <Text style={{ fontSize: 12, color: '#0c4a6e', marginTop: 4 }}>
-              {locationStatus === 'permission_denied'
+              {usesTraccar || locationStatus === 'traccar'
+                ? locationStatus === 'error'
+                  ? 'Traccar is authoritative, but phone GPS could not be stopped. Restart the app.'
+                  : 'Phone GPS sharing is off. The backend receives device locations during this trip.'
+                : locationStatus === 'permission_denied'
                 ? 'Location permission required.'
                 : locationStatus === 'background_permission_denied'
                 ? 'Allow background location to keep sharing when the app is minimized.'
