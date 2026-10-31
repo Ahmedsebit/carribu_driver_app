@@ -5,6 +5,7 @@ import { locationAPI } from './api';
 
 export const DRIVER_LOCATION_TASK = 'carribu-driver-background-location';
 const ACTIVE_TRIP_KEY = 'background_location_trip_id';
+let stopping = null;
 
 TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
   if (error) {
@@ -50,6 +51,7 @@ export async function startBackgroundLocationAsync(tripId) {
     return { started: false, reason: 'background_permission_denied' };
   }
 
+  if (stopping) await stopping;
   const storedTripId = await AsyncStorage.getItem(ACTIVE_TRIP_KEY);
   const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(
     DRIVER_LOCATION_TASK
@@ -84,12 +86,13 @@ export async function startBackgroundLocationAsync(tripId) {
   return { started: true };
 }
 
-export async function stopBackgroundLocationAsync() {
-  const started = await Location.hasStartedLocationUpdatesAsync(
-    DRIVER_LOCATION_TASK
-  );
-  if (started) {
-    await Location.stopLocationUpdatesAsync(DRIVER_LOCATION_TASK);
+export function stopBackgroundLocationAsync() {
+  if (!stopping) {
+    stopping = (async () => {
+      const started = await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK);
+      if (started) await Location.stopLocationUpdatesAsync(DRIVER_LOCATION_TASK);
+      await AsyncStorage.removeItem(ACTIVE_TRIP_KEY);
+    })().finally(() => { stopping = null; });
   }
-  await AsyncStorage.removeItem(ACTIVE_TRIP_KEY);
+  return stopping;
 }

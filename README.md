@@ -10,6 +10,20 @@ A React Native (Expo) mobile application for school transport drivers. Part of t
 - **Messaging** – In-app chat with parents and coordinators
 - **Authentication** – Secure JWT-based login for drivers and coordinators
 
+## Trip workflow
+
+The active trip's server-owned `currentStop` drives navigation. Morning trips
+finish home boarding before school drop-off; afternoon trips require each
+student to be boarded at school or marked absent before reversed home drop-offs.
+Arrival keeps the current stop selected until the student boards or is dropped
+off. The school is the route's final outbound waypoint.
+
+The server freezes the roster and destinations at trip start. Actions include
+their phase and a stable idempotency key, so retrying does not duplicate logs or
+parent alerts. End Trip is disabled until every child is dropped off or absent.
+Existing active afternoon trips from before the upgrade need their boarding
+state reconciled explicitly.
+
 ## Trip location source
 
 For active trips with `locationSource=traccar` or a linked vehicle identifier,

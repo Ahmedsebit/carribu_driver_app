@@ -17,80 +17,32 @@ const TripScreen = () => {
   const [actionLoading, setActionLoading] = useState(null);
   const [locationStatus, setLocationStatus] = useState('waiting');
   const [broadcasting, setBroadcasting] = useState(false);
-  const [skippedStops, setSkippedStops] = useState([]);
   const locationSubscription = useRef(null);
+  const dataRequest = useRef(0);
   const usesTraccar = activeTrip?.locationSource === 'traccar' || Boolean(activeTrip?.vehicle?.trackerUniqueId);
+  const validCoordinate = (lat, lng) => Number.isFinite(lat) && Number.isFinite(lng);
 
   const fetchData = useCallback(async () => {
+    const requestId = ++dataRequest.current;
     try {
       const [a, t] = await Promise.all([
         driverAPI.getActiveTrip(),
         driverAPI.getMyTrips(),
       ]);
+      if (requestId !== dataRequest.current) return;
       setActiveTrip(a.data.activeTrip);
       setTodayTrips(t.data.trips);
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === dataRequest.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
-  // Compute the next stop locally based on trip type:
-  // - Pickup trips: navigate to next pending student's pickup location
-  // - Dropoff trips: navigate to next on_bus student's dropoff location
-  // After "Arrived" is pressed, skip that student for navigation
-  const getNextStop = () => {
-    if (!activeTrip?.pickupList) return null;
-    // react-native-maps requires numeric lat/lng; the API returns DECIMAL
-    // columns as strings, which crashes the native map. Coerce to Number.
-    const toNum = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
-    const isDropoff = activeTrip.type === 'afternoon_dropoff';
-
-    if (isDropoff) {
-      // For drop-off: find next on_bus student not yet arrived at
-      const next = activeTrip.pickupList.find(
-        (s) => s.status === 'on_bus' && !skippedStops.includes(s.studentId)
-      );
-      if (!next) return null;
-      return {
-        ...next,
-        address: next.dropoffAddress || next.pickupAddress,
-        lat: toNum(next.dropoffLat ?? next.pickupLat),
-        lng: toNum(next.dropoffLng ?? next.pickupLng),
-        phase: 'dropoff',
-      };
-    } else {
-      // For pickup: find next pending student not yet arrived at
-      const next = activeTrip.pickupList.find(
-        (s) => s.status === 'pending' && !skippedStops.includes(s.studentId)
-      );
-      if (next) {
-        return {
-          ...next,
-          address: next.pickupAddress,
-          lat: toNum(next.pickupLat),
-          lng: toNum(next.pickupLng),
-          phase: 'pickup',
-        };
-      }
-      // If no more pending, switch to drop-off phase for on_bus students
-      const nextDropoff = activeTrip.pickupList.find(
-        (s) => s.status === 'on_bus' && !skippedStops.includes(s.studentId)
-      );
-      if (!nextDropoff) return null;
-      return {
-        ...nextDropoff,
-        address: nextDropoff.dropoffAddress || nextDropoff.pickupAddress,
-        lat: toNum(nextDropoff.dropoffLat ?? nextDropoff.pickupLat),
-        lng: toNum(nextDropoff.dropoffLng ?? nextDropoff.pickupLng),
-        phase: 'dropoff',
-      };
-    }
-  };
-
-  const nextStop = activeTrip ? getNextStop() : null;
+  const nextStop = activeTrip?.currentStop || null;
 
   useEffect(() => {
     fetchData();
@@ -123,11 +75,6 @@ const TripScreen = () => {
       }
     };
   }, [fetchData]);
-
-  // Reset skipped stops when active trip changes
-  useEffect(() => {
-    setSkippedStops([]);
-  }, [activeTrip?.id]);
 
   useEffect(() => {
     if (activeTrip) {
@@ -233,7 +180,7 @@ const TripScreen = () => {
   }, [activeTrip?.id, usesTraccar, fetchData]);
 
   const handleAcknowledge = (id) =>
-    Alert.alert('Acknowledge & Start Trip', 'Acknowledge this trip? It will officially start and parents will be notified.', [
+    Alert.alert('Acknowledge & Start Trip', 'Acknowledge this trip? It will officially start and parent notifications will be queued.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Acknowledge & Start',
@@ -258,12 +205,20 @@ const TripScreen = () => {
         onPress: async () => {
           try {
             await tripAPI.endTrip(id);
-            await stopBackgroundLocationAsync();
-            Alert.alert('✅', 'Trip completed!');
-            fetchData();
           } catch (e) {
             Alert.alert('Error', e.response?.data?.error || 'Failed');
+            return;
           }
+          ++dataRequest.current;
+          setActiveTrip(null);
+          try {
+            await stopBackgroundLocationAsync();
+            Alert.alert('✅', 'Trip completed!');
+          } catch (error) {
+            console.warn('Trip ended, but phone GPS cleanup failed:', error.message);
+            Alert.alert('Trip completed - GPS warning', 'The trip ended successfully, but phone location sharing could not be stopped.');
+          }
+          fetchData();
         },
       },
     ]);
@@ -271,15 +226,16 @@ const TripScreen = () => {
   const handleAction = async (tripId, studentId, action, name) => {
     setActionLoading(`${studentId}-${action}`);
     try {
-      await tripAPI.logAction(tripId, { studentId, action });
-      // When driver arrives at a stop, move to next student immediately
-      if (action === 'arrived') {
-        setSkippedStops((prev) => [...prev, studentId]);
-      }
-      // When status actually changes, remove from skipped list
-      if (action === 'check_in' || action === 'absent' || action === 'check_out') {
-        setSkippedStops((prev) => prev.filter((id) => id !== studentId));
-      }
+      const student = activeTrip.pickupList.find(s => s.studentId === studentId);
+      const phase = action === 'check_out' || (action === 'arrived' && ['on_bus', 'arrived_dropoff'].includes(student?.status))
+        ? 'dropoff' : 'pickup';
+      const { data } = await tripAPI.logAction(tripId, {
+        studentId, action, phase, idempotencyKey: `${tripId}:${studentId}:${phase}:${action}`,
+      });
+      setActiveTrip(previous => previous?.id === tripId ? {
+        ...previous, pickupList: data.pickupList, currentStop: data.currentStop,
+        nextStop: data.nextStop, phase: data.phase, canEnd: data.canEnd, stats: data.stats,
+      } : previous);
       Alert.alert('✅', `${name}: ${action}`);
       fetchData();
     } catch (e) {
@@ -309,10 +265,14 @@ const TripScreen = () => {
                 {activeTrip.vehicle?.plateNumber} • {activeTrip.type === 'morning_pickup' ? '🌅 Morning' : '🌇 Afternoon'}
               </Text>
             </View>
-            <TouchableOpacity style={{ backgroundColor: '#dc2626', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 }} onPress={() => handleEnd(activeTrip.id)}>
+            <TouchableOpacity disabled={!activeTrip.canEnd || Boolean(actionLoading)} style={{ backgroundColor: activeTrip.canEnd ? '#dc2626' : '#64748b', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 }} onPress={() => handleEnd(activeTrip.id)}>
               <Text style={{ color: '#fff', fontWeight: '600' }}>⏹ End</Text>
             </TouchableOpacity>
           </View>
+          <Text style={{ color: '#bfdbfe', marginTop: 8 }}>
+            Phase: {activeTrip.phase?.replace(/_/g, ' ')}.
+            {!activeTrip.canEnd ? ' Record every student as dropped off or absent before ending.' : ' All students accounted for.'}
+          </Text>
           {activeTrip.stats && (
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
               {[
@@ -337,9 +297,10 @@ const TripScreen = () => {
                 #{nextStop.stopNumber} {nextStop.studentName}
               </Text>
               <Text style={{ fontSize: 13, color: nextStop.phase === 'dropoff' ? '#1e40af' : '#92400e', marginBottom: 8 }}>{nextStop.address || 'No address'}</Text>
-              {nextStop.lat && nextStop.lng ? (
+              {validCoordinate(nextStop.lat, nextStop.lng) ? (
                 <View style={{ borderRadius: 10, overflow: 'hidden', height: 160 }}>
                   <MapView
+                    key={`${nextStop.studentId}-${nextStop.phase}-${nextStop.lat}-${nextStop.lng}`}
                     style={{ flex: 1 }}
                     initialRegion={{
                       latitude: nextStop.lat,
@@ -416,8 +377,8 @@ const TripScreen = () => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} />}
           ListHeaderComponent={<Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 12 }}>🎒 Pickup List ({activeTrip.pickupList?.length || 0})</Text>}
           renderItem={({ item }) => {
-            const colors = { pending: '#f59e0b', arrived: '#f97316', on_bus: '#2563eb', dropped_off: '#16a34a', absent: '#dc2626' };
-            const labels = { pending: '⏳ Pending', arrived: '📍 Arrived', on_bus: '🚌 On Bus', dropped_off: '✅ Done', absent: '❌ Absent' };
+            const colors = { pending: '#f59e0b', arrived_pickup: '#f97316', arrived_dropoff: '#f97316', on_bus: '#2563eb', dropped_off: '#16a34a', absent: '#dc2626' };
+            const labels = { pending: '⏳ Pending', arrived_pickup: 'At pickup', arrived_dropoff: 'At drop-off', on_bus: '🚌 On Bus', dropped_off: '✅ Done', absent: '❌ Absent' };
             return (
               <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: colors[item.status] }}>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
@@ -450,7 +411,7 @@ const TripScreen = () => {
                     </TouchableOpacity>
                   </View>
                 )}
-                {item.status === 'arrived' && (
+                {item.status === 'arrived_pickup' && (
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                     <TouchableOpacity style={{ flex: 1, backgroundColor: '#2563eb', borderRadius: 10, padding: 12, alignItems: 'center' }} onPress={() => handleAction(activeTrip.id, item.studentId, 'check_in', item.studentName)}>
                       <Text style={{ color: '#fff', fontWeight: '600' }}>📥 Pick Up</Text>
@@ -460,9 +421,9 @@ const TripScreen = () => {
                     </TouchableOpacity>
                   </View>
                 )}
-                {item.status === 'on_bus' && (
+                {['on_bus', 'arrived_dropoff'].includes(item.status) && ['dropoff', 'school_dropoff'].includes(activeTrip.phase) && (
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                    <TouchableOpacity style={{ flex: 1, backgroundColor: '#f59e0b', borderRadius: 10, padding: 12, alignItems: 'center' }} onPress={() => handleAction(activeTrip.id, item.studentId, 'arrived', item.studentName)}>
+                    <TouchableOpacity disabled={item.status === 'arrived_dropoff'} style={{ flex: 1, backgroundColor: '#f59e0b', borderRadius: 10, padding: 12, alignItems: 'center' }} onPress={() => handleAction(activeTrip.id, item.studentId, 'arrived', item.studentName)}>
                       <Text style={{ color: '#fff', fontWeight: '600' }}>📍 Arrived</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={{ flex: 1, backgroundColor: '#16a34a', borderRadius: 10, padding: 12, alignItems: 'center' }} onPress={() => handleAction(activeTrip.id, item.studentId, 'check_out', item.studentName)}>

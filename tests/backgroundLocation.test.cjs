@@ -94,3 +94,9 @@ test('does not silently disable phone tracking on a temporary backend failure', 
   assert.equal(calls.stop, 0);
   assert.equal(storage.has('background_location_trip_id'), true);
 });
+
+test('concurrent trip-end and screen cleanup stop the phone task only once', async () => {
+  const { calls, exports } = loadTask();
+  await Promise.all([exports.stopBackgroundLocationAsync(), exports.stopBackgroundLocationAsync()]);
+  assert.equal(calls.stop, 1);
+});
